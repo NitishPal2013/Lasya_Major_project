@@ -1,0 +1,8 @@
+streamlit
+langchain_google_genai
+langchain.prompts
+langchain_core
+langchain_community
+python-dotenv
+pydantic
+PyPDF2

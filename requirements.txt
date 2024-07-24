@@ -1,8 +1,8 @@
 streamlit
 langchain_google_genai
-langchain.prompts
+langchain
 langchain_core
 langchain_community
 python-dotenv
 pydantic
-PyPDF2
+PyMuPDf

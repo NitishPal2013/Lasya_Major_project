@@ -2,8 +2,10 @@ import streamlit as st
 from langchain_google_genai import GoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_community.document_loaders.pdf import PyPDFLoader
+from langchain_community.document_loaders.pdf import PyMuPDFLoader
+from langchain_core.runnables import RunnablePassthrough
 from dotenv import load_dotenv
+import json
 import os
 from langchain.globals import set_verbose
 
@@ -13,45 +15,49 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 load_dotenv()
 
-class Question(BaseModel):
-    question: str
-    options: list[str]
-    answer: str
+class question(BaseModel):
+    question: str = Field(description="The question")
+    options: list[str] = Field(description="list of 4 options for the question")
+    correct: str = Field(description="correct option or answer of the question")
+
+
+class QuestionList(BaseModel):
+    questions: list[question] = Field(alias="questions List")
 
 API_KEY = os.environ["GOOGLE_API_KEY"]
-gemini_model = GoogleGenerativeAI(model="gemini-pro", google_api_key=API_KEY)
-parser = JsonOutputParser(pydantic_object=Question)
+gemini_model = GoogleGenerativeAI(model="gemini-1.5-flash-001",temperature=0.5, google_api_key=API_KEY)
+parser = JsonOutputParser(pydantic_object=QuestionList)
 
 prompt = PromptTemplate(template="""
-Task: Generate at least 2 or a maximum of 10 multiple choice questions and their answers from within the given context.
-Output format: The output should be in JSON format.
-Here is the field format:
-    question: str
-    options: list[str]
-    answer: str
+Task: Generate 10 multiple choice questions and their answers from within the given context.
+Output format:
+{format_instructions}                        
 
-1) Question 1
-    a) option 1
-    b) option 2
-    c) option 3
-    d) option 4
+Context: 
+{context}
+""", input_variables=["context"],partial_variables={"format_instructions": parser.get_format_instructions()})
 
-    correct: a) option 1
+chain = {"context": RunnablePassthrough()} | prompt | gemini_model | parser
 
-Given context: {context}
-""", input_variables=["context"])
-
-chain = prompt | gemini_model
-
-def generate_questions(doc):
+def generate_questions(content : str):
     try:
-        res = chain.invoke({"context": doc.page_content})
-        res = parser.parse(res)
+        res = chain.invoke(content)
         return res
     except Exception as e:
         # Log the error internally and continue
         print(f"Error generating questions: {e}")
         return None
+
+def format_docs(docs):
+    return "/n".join(doc.page_content for doc in docs)
+
+
+# loader = PyMuPDFLoader("./uploaded_pdf.pdf")
+# docs = loader.load()
+# content = format_docs(docs)
+
+# print(content)
+
 
 st.title("Multiple Choice Question Generator")
 st.markdown("Upload a PDF file and we'll generate multiple choice questions and answers for you.")
@@ -64,45 +70,39 @@ if uploaded_file is not None:
         f.write(uploaded_file.getvalue())
 
     # Load the uploaded PDF file
-    loader = PyPDFLoader("uploaded_pdf.pdf")
+    loader = PyMuPDFLoader("uploaded_pdf.pdf")
     docs = loader.load()
-
-    
-
-    # Generate questions and answers
-    questions = []
+    content = format_docs(docs)
+    # print(content)
     try:
-        for doc in docs[:2]:
-            question = generate_questions(doc)
-            if question:
-                questions.append(question)
+        questions = generate_questions(content)        
     except Exception as e:
         # Log the error internally and continue
         print(f"Error in question generation loop: {e}")
 
-
     # Display questions
     st.write("**Questions:**")
-    for i,question in enumerate(questions):
-        for j,ques in enumerate(question["questions"]):
-            st.write(f"**Q: {ques['question']}**")
-            st.radio("Options:",ques["options"], key=f"{i}{j}")
-
-    # Submit button
-    if st.button("Submit"):
-        score = 0
-        correct_answers = []
-        wrong_answers = []
-        for i,question in enumerate(questions):        
-            for j,ques in enumerate(question["questions"]):
-                selected_option = st.session_state.get(f"{i}{j}")
-                if selected_option == ques['answer']:
+    if questions:
+        for i, question in enumerate(questions["questions List"]):
+            st.write(f"**Q: {question['question']}**")
+            st.radio("Options:", question["options"], key=f"{i}")
+        
+        # Submit button
+        if st.button("Submit"):
+            score = 0
+            correct_answers = []
+            wrong_answers = []
+            for i, question in enumerate(questions["questions List"]):
+                selected_option = st.session_state.get(f"{i}")
+                if selected_option == question['correct']:
                     score += 1
-                    correct_answers.append(ques['question'])
+                    correct_answers.append(question['question'])
                 else:
-                    wrong_answers.append(ques['question'])
+                    wrong_answers.append(question['question'])
 
-        # Display score and answers
-        st.write("**Score:**", score)
-        st.write("**Correct Answers:**", correct_answers)
-        st.write("**Wrong Answers:**", wrong_answers)
+            # Display score and answers
+            st.write("**Score:**", score)
+            st.write("**Correct Answers:**", correct_answers)
+            st.write("**Wrong Answers:**", wrong_answers)
+    else:
+        st.write("No questions generated.")

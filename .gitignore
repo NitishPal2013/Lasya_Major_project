@@ -1,0 +1,7 @@
+venv
+./test.py
+./chatbot.py
+./index.pkl
+./uploaded_pdf.pdf
+./pyvenv.cfg
+./.env

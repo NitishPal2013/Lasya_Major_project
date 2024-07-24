@@ -29,7 +29,7 @@ gemini_model = GoogleGenerativeAI(model="gemini-1.5-flash-001",temperature=0.5, 
 parser = JsonOutputParser(pydantic_object=QuestionList)
 
 prompt = PromptTemplate(template="""
-Task: Generate 10 multiple choice questions and their answers from within the given context.
+Task: Generate 10 multiple choice questions and their answers from within the given context similar to given in the context but different.
 Output format:
 {format_instructions}                        
 

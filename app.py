@@ -29,8 +29,12 @@ gemini_model = GoogleGenerativeAI(model="gemini-1.5-flash-001",temperature=0.5, 
 parser = JsonOutputParser(pydantic_object=QuestionList)
 
 prompt = PromptTemplate(template="""
-Task: Generate 10 multiple choice questions and their answers from within the given context similar to given in the context but different.
+Task: Generate 15 multiple choice questions and their answers from within the given context.
       Some of them should be straight forward for knowledge test and some of them should be like **Case studies** or **Scenario Based**.
+Remeber:
+    - Do not provide the same questions present in context.
+    - You need to generate questions like present in context with some more difficulty and technicality.
+    - Provide the questions in such manner so that user can test his/her Knowledge completely.
 Output format:
 {format_instructions}                        
 

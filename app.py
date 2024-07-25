@@ -30,6 +30,7 @@ parser = JsonOutputParser(pydantic_object=QuestionList)
 
 prompt = PromptTemplate(template="""
 Task: Generate 10 multiple choice questions and their answers from within the given context similar to given in the context but different.
+      Some of them should be straight forward for knowledge test and some of them should be like **Case studies** or **Scenario Based**.
 Output format:
 {format_instructions}                        
 

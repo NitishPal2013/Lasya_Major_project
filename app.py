@@ -15,30 +15,59 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 load_dotenv()
 
-class question(BaseModel):
+class Question(BaseModel):
     question: str = Field(description="The question")
-    options: list[str] = Field(description="list of 4 options for the question")
+    options: list[str] = Field(description="list of 4 options for the question with one correct and other incorrect")
     correct: str = Field(description="correct option or answer of the question")
 
-
 class QuestionList(BaseModel):
-    questions: list[question] = Field(alias="questions List")
+    case_study: str = Field(description="generated case study for the questions")
+    questions: list[Question] = Field(description="list of 5 question, options and correct option")
+
+
+class CaseStudyQuestions(BaseModel):
+    case_studies: list[QuestionList] = Field(description="list of 5 case studies and its questions.")
+
 
 API_KEY = os.environ["GOOGLE_API_KEY"]
-gemini_model = GoogleGenerativeAI(model="gemini-1.5-flash-001",temperature=0.5, google_api_key=API_KEY)
-parser = JsonOutputParser(pydantic_object=QuestionList)
+gemini_model = GoogleGenerativeAI(model="gemini-1.5-flash-001",temperature=0.7, google_api_key=API_KEY)
+parser = JsonOutputParser(pydantic_object=CaseStudyQuestions)
+
 
 prompt = PromptTemplate(template="""
-Task: Generate 15 multiple choice questions and their answers from within the given context.
-      Some of them should be straight forward for knowledge test and some of them should be like **Case studies** or **Scenario Based**.
-Remeber:
-    - Do not provide the same questions present in context.
-    - You need to generate questions like present in context with some more difficulty and technicality.
-    - Provide the questions in such manner so that user can test his/her Knowledge completely.
-Output format:
-{format_instructions}                        
+### Objective
 
-Context: 
+You are an AI designed to generate case study-based multiple-choice questions (MCQs) from the given context.
+
+### Steps
+
+1. **Comprehend the Content**
+
+   - Carefully read and understand the provided context.
+   - Identify key concepts, important details, and overall context.
+
+2. **Generate Case Study-Based MCQs**
+
+   - Create a scenario or case study based on the content.
+   - Ensure the case study is relevant and logically derived from the given material.
+
+3. **Formulate Questions**
+
+   - Develop multiple-choice questions (MCQs) based on the case study.
+   - Each question should have one correct answer and three plausible distractors (incorrect options).
+
+4. **Maintain Quality and Difficulty**
+
+   - Ensure questions vary in difficulty, including some that test basic understanding and others that challenge deeper comprehension.
+   - Questions should test application, analysis, and evaluation based on the case study.
+
+### Output Format
+
+Generate the scenario, questions, and options in JSON format with the following structure:
+
+{format_instructions}
+
+Context:
 {context}
 """, input_variables=["context"],partial_variables={"format_instructions": parser.get_format_instructions()})
 
@@ -85,29 +114,40 @@ if uploaded_file is not None:
         # Log the error internally and continue
         print(f"Error in question generation loop: {e}")
 
+    # print(questions)
+
     # Display questions
     st.write("**Questions:**")
     if questions:
-        for i, question in enumerate(questions["questions List"]):
-            st.write(f"**Q: {question['question']}**")
-            st.radio("Options:", question["options"], key=f"{i}")
+        for i, case in enumerate(questions["case_studies"]):
+            st.write(f"**Case {i+1} : {case['case_study']}**")
+            for j, question in enumerate(case["questions"]):
+                st.write(f"**Q{j+1}: {question['question']}**")
+                st.radio("Options : ",question['options'], key= f"{j+1 + 5*i}")
         
-        # Submit button
-        if st.button("Submit"):
-            score = 0
-            correct_answers = []
-            wrong_answers = []
-            for i, question in enumerate(questions["questions List"]):
-                selected_option = st.session_state.get(f"{i}")
-                if selected_option == question['correct']:
-                    score += 1
-                    correct_answers.append(question['question'])
-                else:
-                    wrong_answers.append(question['question'])
+        st.write("Correct Options")
+        for i, case in enumerate(questions["case_studies"]):
+            st.write(f"**Case {i+1} : {case['case_study']}**")
+            for j, question in enumerate(case["questions"]):
+                st.write(f"**Q{j+1}: {question['question']}**")
+                st.write(f"Answer: {question['correct']}")
 
-            # Display score and answers
-            st.write("**Score:**", score)
-            st.write("**Correct Answers:**", correct_answers)
-            st.write("**Wrong Answers:**", wrong_answers)
+        # Submit button
+        # if st.button("Submit"):
+        #     score = 0
+        #     correct_answers = []
+        #     wrong_answers = []
+        #     for i, question in enumerate(questions["questions List"]):
+        #         selected_option = st.session_state.get(f"{i}")
+        #         if selected_option == question['correct']:
+        #             score += 1
+        #             correct_answers.append(question['question'])
+        #         else:
+        #             wrong_answers.append(question['question'])
+
+        #     # Display score and answers
+        #     st.write("**Score:**", score)
+        #     st.write("**Correct Answers:**", correct_answers)
+        #     st.write("**Wrong Answers:**", wrong_answers)
     else:
         st.write("No questions generated.")
